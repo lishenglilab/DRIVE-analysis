@@ -1,5 +1,5 @@
 ############################################################
-## fig3c_performance_rank_score_boxpanel.R
+## fig3c_performance_rank_score.R
 ##
 ## Purpose:
 ##   Generate Fig. 3C performance RANK_SCORE plot from one fixed
