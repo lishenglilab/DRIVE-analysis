@@ -1,5 +1,5 @@
 ############################################################
-## fig3c_performance_rank_score.R
+## fig3c_performance_rank_score_boxpanel.R
 ##
 ## Purpose:
 ##   Generate Fig. 3C performance RANK_SCORE plot from one fixed
@@ -15,10 +15,6 @@
 ##   - R2, PCC, SCC, NDCG, NWPC: higher value is better, rank 1 is best.
 ##
 ##   RANK_SCORE = number_of_methods - Rank + 1
-##
-##   Therefore:
-##   - the best method for a metric gets the highest RANK_SCORE
-##   - the worst method for a metric gets RANK_SCORE = 1
 ##
 ## Input:
 ##   final_metrics_evaluation_ELITE_INTERSECTION.csv
@@ -41,7 +37,6 @@ suppressPackageStartupMessages({
 ## 1. User settings
 ############################################################
 
-## Example path. Replace this with your own project directory.
 work_dir <- "path/to/your/project"
 setwd(work_dir)
 
@@ -78,9 +73,7 @@ data <- data %>%
   select(Method, all_of(metrics_cols)) %>%
   mutate(across(all_of(metrics_cols), as.numeric))
 
-## Enforce one fixed result per method.
-## If duplicated methods are present, their metric values are averaged first.
-## For the final figure, the input should ideally already contain one row per method.
+## If duplicated methods are present, average them first.
 data_single <- data %>%
   group_by(Method) %>%
   summarise(
@@ -174,11 +167,11 @@ metric_colors <- c(
 )
 
 ############################################################
-## 7. Plot Fig. 3C
+## 7. Plot Fig. 3C (boxed panel version)
 ############################################################
 
 p <- ggplot() +
-
+  
   ## Grey summary stems
   geom_segment(
     data = method_summary,
@@ -192,7 +185,7 @@ p <- ggplot() +
     linewidth = 3.2,
     lineend = "butt"
   ) +
-
+  
   ## Grey median summary circles
   geom_point(
     data = method_summary,
@@ -202,7 +195,7 @@ p <- ggplot() +
     color = "#C8C8C8",
     alpha = 0.95
   ) +
-
+  
   ## Colored metric points
   geom_point(
     data = rank_details,
@@ -216,25 +209,29 @@ p <- ggplot() +
     alpha = 0.95,
     position = position_jitter(width = 0.14, height = 0)
   ) +
-
+  
   scale_color_manual(values = metric_colors, name = "Metric") +
-
+  
   scale_y_continuous(
     limits = c(0, number_of_methods + 1),
-    breaks = seq(0, number_of_methods, by = 5)
+    breaks = seq(0, number_of_methods, by = 5),
+    expand = expansion(mult = c(0, 0.02))
   ) +
-
+  
   labs(
     x = "Methods",
     y = "Performance RANK_SCORE"
   ) +
-
-  theme_classic(base_size = 13) +
+  
+  theme_bw(base_size = 13) +
   theme(
-    panel.grid = element_blank(),
-    plot.background = element_rect(fill = "#F2F2F2", color = NA),
-    panel.background = element_rect(fill = "#F2F2F2", color = NA),
-    legend.background = element_rect(fill = "#F2F2F2", color = NA),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    panel.border = element_rect(colour = "#333333", fill = NA, linewidth = 0.8),
+    plot.background = element_rect(fill = "#F2F2F2", colour = NA),
+    panel.background = element_rect(fill = "#F2F2F2", colour = NA),
+    legend.background = element_rect(fill = "#F2F2F2", colour = NA),
+    legend.key = element_rect(fill = "#F2F2F2", colour = NA),
     axis.text.x = element_text(
       angle = 45,
       hjust = 1,
@@ -244,8 +241,8 @@ p <- ggplot() +
     ),
     axis.text.y = element_text(color = "#333333"),
     axis.title = element_text(color = "#333333", size = 14),
-    axis.line = element_line(color = "#333333", linewidth = 0.6),
-    axis.ticks = element_line(color = "#333333"),
+    axis.ticks = element_line(color = "#333333", linewidth = 0.5),
+    axis.line = element_blank(),
     legend.position = "right",
     legend.title = element_text(size = 12),
     legend.text = element_text(size = 10)
@@ -270,15 +267,3 @@ ggsave(
   height = 6.8,
   dpi = 300
 )
-
-############################################################
-## Finished
-############################################################
-
-message("Fig. 3C rank-score plot finished.")
-message("Output directory: ", normalizePath(out_dir))
-message("Output files:")
-message("  - Fig3C_performance_rank_score.pdf")
-message("  - Fig3C_performance_rank_score.png")
-message("  - Fig3C_rankscore_calculation_details.csv")
-message("  - Fig3C_method_rankscore_summary.csv")
