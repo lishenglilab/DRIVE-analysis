@@ -102,14 +102,14 @@ def plot_residual_correlation(df):
         annot_kws={"size": 10},
         cbar_kws={"shrink": 0.7, "label": "Spearman Correlation of Residuals"},
     )
-    plt.title("Supplementary Fig. S7 | Residual Correlation among Base Models",
+    plt.title("Supplementary Fig. S10 | Residual Correlation among Base Models",
               fontsize=15, pad=20, fontweight="bold")
     plt.xticks(rotation=45, ha="right", fontsize=11)
     plt.yticks(rotation=0, fontsize=11)
     plt.xlabel("")
     plt.ylabel("")
     plt.tight_layout()
-    plt.savefig("SupFig_S7_residual_correlation.pdf", bbox_inches="tight")
+    plt.savefig("SupFig_S10_residual_correlation.pdf", bbox_inches="tight")
     plt.close()
 
 if __name__ == "__main__":
