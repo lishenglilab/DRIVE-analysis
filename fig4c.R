@@ -1,6 +1,21 @@
 ############################################################
 ## fig4c_drug_phase_donut.R
-## Output: concentric_donut_polyline_final.pdf
+##
+## Purpose:
+##   Generate the Fig. 4C drug-phase comparison donut plot.
+##
+## Input:
+##   fig4c_comparison_data.csv
+##
+## Required columns:
+##   1. drug_name
+##   2. Max_Phase
+##   3. actual_log_ic50
+##   4. predicted_ic50
+##
+## Output:
+##   1. fig4c_drug_phase_donut/fig4c_drug_phase_summary.csv
+##   2. fig4c_drug_phase_donut/concentric_donut_polyline_final.pdf
 ############################################################
 
 suppressPackageStartupMessages({
@@ -9,14 +24,26 @@ suppressPackageStartupMessages({
   library(forcats)
 })
 
-work_dir <- "path/to/your/project"
+get_script_dir <- function() {
+  args <- commandArgs(trailingOnly = FALSE)
+  file_arg <- grep("^--file=", args, value = TRUE)
+  if (length(file_arg) > 0) {
+    return(dirname(normalizePath(sub("^--file=", "", file_arg[1]), winslash = "/", mustWork = FALSE)))
+  }
+  getwd()
+}
+
+work_dir <- get_script_dir()
 setwd(work_dir)
 
 input_file <- "fig4c_comparison_data.csv"
 out_dir <- "fig4c_drug_phase_donut"
 dir.create(out_dir, showWarnings = FALSE, recursive = TRUE)
 
-## Required columns: drug_name, Max_Phase, actual_log_ic50, predicted_ic50
+if (!file.exists(input_file)) {
+  stop("Input file not found: ", input_file)
+}
+
 comparison_data <- read.csv(input_file, header = TRUE, check.names = FALSE, stringsAsFactors = FALSE)
 
 required_cols <- c("drug_name", "Max_Phase", "actual_log_ic50", "predicted_ic50")
