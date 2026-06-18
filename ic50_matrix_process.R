@@ -31,7 +31,16 @@
 ############################################################
 
 ## Example path. Replace this with your own project directory.
-work_dir <- "path/to/your/project"
+get_script_dir <- function() {
+  args <- commandArgs(trailingOnly = FALSE)
+  file_arg <- grep("^--file=", args, value = TRUE)
+  if (length(file_arg) > 0) {
+    return(dirname(normalizePath(sub("^--file=", "", file_arg[1]), winslash = "/", mustWork = FALSE)))
+  }
+  getwd()
+}
+
+work_dir <- get_script_dir()
 setwd(work_dir)
 
 response_file <- "secondary-screen-dose-response-curve-parameters.csv"
