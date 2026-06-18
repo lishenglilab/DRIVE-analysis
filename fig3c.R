@@ -37,7 +37,16 @@ suppressPackageStartupMessages({
 ## 1. User settings
 ############################################################
 
-work_dir <- "path/to/your/project"
+get_script_dir <- function() {
+  args <- commandArgs(trailingOnly = FALSE)
+  file_arg <- grep("^--file=", args, value = TRUE)
+  if (length(file_arg) > 0) {
+    return(dirname(normalizePath(sub("^--file=", "", file_arg[1]), winslash = "/", mustWork = FALSE)))
+  }
+  getwd()
+}
+
+work_dir <- get_script_dir()
 setwd(work_dir)
 
 input_file <- "final_metrics_evaluation_ELITE_INTERSECTION.csv"
