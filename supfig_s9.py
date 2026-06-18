@@ -1,13 +1,28 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+"""
+Purpose:
+    Generate Supplementary Fig. S9 showing SHAP stability and standalone
+    RandomForest performance across cross-validation folds.
+
+Input files:
+    1. ic50.csv
+    2. cellline2.csv
+    3. Prediction files listed in FULL_MODEL_POOL
+
+Output files:
+    1. SupFig_S9_SHAP_stability.pdf
+    2. SupFig_S9_SHAP_importance_by_fold.csv
+    3. SupFig_S9_standalone_rmse_by_fold.csv
+"""
 
 import os
 import warnings
 from functools import reduce
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
-import shap
 import matplotlib.pyplot as plt
 import seaborn as sns
 from scipy.stats import spearmanr
@@ -16,9 +31,16 @@ from sklearn.metrics import mean_squared_error
 from sklearn.ensemble import RandomForestRegressor
 from tqdm import tqdm
 
+try:
+    import shap
+    HAS_SHAP = True
+except ImportError:
+    shap = None
+    HAS_SHAP = False
+
 warnings.filterwarnings("ignore")
 
-WORK_DIR = "path/to/your/project"
+WORK_DIR = Path(__file__).resolve().parent
 os.chdir(WORK_DIR)
 
 CELL_MAP_FILE = "cellline2.csv"
@@ -129,11 +151,21 @@ def run_shap_cv_analysis():
             min_samples_leaf=5, max_features="sqrt"
         )
         model.fit(X_train, y_train)
-        explainer = shap.TreeExplainer(model)
-        shap_values = explainer.shap_values(X_test)
-        mas = np.abs(shap_values).mean(axis=0)
+        if HAS_SHAP:
+            explainer = shap.TreeExplainer(model)
+            shap_values = explainer.shap_values(X_test)
+            mas = np.abs(shap_values).mean(axis=0)
+            source_label = "SHAP"
+        else:
+            mas = getattr(model, "feature_importances_", np.zeros(len(current_features)))
+            source_label = "RandomForest feature_importances_"
         for i, feature in enumerate(current_features):
-            shap_records.append({"Fold": fold, "Model": feature, "SHAP_Importance": mas[i]})
+            shap_records.append({
+                "Fold": fold,
+                "Model": feature,
+                "SHAP_Importance": mas[i],
+                "Importance_Source": source_label,
+            })
             perf_records.append({
                 "Fold": fold,
                 "Model": feature,
@@ -153,7 +185,7 @@ def plot_shap_stability(shap_df, perf_df):
     order = shap_df.groupby("Model")["SHAP_Importance"].mean().sort_values(ascending=False).index
     sns.boxplot(x="Model", y="SHAP_Importance", data=shap_df, order=order, ax=ax1, palette="vlag", fliersize=0)
     sns.stripplot(x="Model", y="SHAP_Importance", data=shap_df, order=order, ax=ax1, color=".3", size=4, jitter=True)
-    ax1.set_title("A. SHAP Importance Distribution across 5 Folds", fontsize=16, loc="left", pad=15)
+    ax1.set_title("A. Meta-model Importance Distribution across 5 Folds", fontsize=16, loc="left", pad=15)
     ax1.set_xticklabels(ax1.get_xticklabels(), rotation=45, ha="right")
     ax1.set_ylabel("Mean Absolute SHAP Value")
 
@@ -179,7 +211,7 @@ def plot_shap_stability(shap_df, perf_df):
     ax3.set_ylabel("SHAP Meta-Model Contribution")
 
     plt.tight_layout()
-    plt.savefig("SupFig_S6_SHAP_stability.pdf", dpi=300, bbox_inches="tight")
+    plt.savefig("SupFig_S9_SHAP_stability.pdf", dpi=300, bbox_inches="tight")
     plt.close()
 
 if __name__ == "__main__":
