@@ -1,4 +1,39 @@
-library(tidyverse)
+############################################################
+## fig1d_tissue_subtype_polar_barplot.R
+##
+## Purpose:
+##   Generate the Fig. 1D tissue-subtype polar bar plot.
+##
+## Input:
+##   figureD_panel.csv
+##
+## Required columns:
+##   1. system_group : major tissue/system group
+##   2. subtype      : subtype label displayed inside each bar
+##   3. count        : subtype count used as bar height
+##   4. fill_color   : fill color for the subtype bar
+##
+## Output:
+##   1. figureD_panel.pdf
+##   2. figureD_panel.svg
+##   3. figureD_panel.png
+############################################################
+
+suppressPackageStartupMessages({
+  library(tidyverse)
+})
+
+get_script_dir <- function() {
+  args <- commandArgs(trailingOnly = FALSE)
+  file_arg <- grep("^--file=", args, value = TRUE)
+  if (length(file_arg) > 0) {
+    return(dirname(normalizePath(sub("^--file=", "", file_arg[1]), winslash = "/", mustWork = FALSE)))
+  }
+  getwd()
+}
+
+work_dir <- get_script_dir()
+setwd(work_dir)
 
 input_file <- "figureD_panel.csv"
 
@@ -25,10 +60,20 @@ outer_colors <- c(
   "Large intestine" = "#B85E28"
 )
 
-df <- read.csv(input_file, stringsAsFactors = FALSE) %>%
-  mutate(system_group = factor(system_group, levels = group_order))
+if (!file.exists(input_file)) {
+  stop("Input file not found: ", input_file)
+}
+
+required_cols <- c("system_group", "subtype", "count", "fill_color")
+df <- read.csv(input_file, stringsAsFactors = FALSE)
+
+missing_cols <- setdiff(required_cols, colnames(df))
+if (length(missing_cols) > 0) {
+  stop("Missing columns: ", paste(missing_cols, collapse = ", "))
+}
 
 df <- df %>%
+  mutate(system_group = factor(system_group, levels = group_order)) %>%
   group_by(system_group) %>%
   mutate(group_total = n()) %>%
   ungroup() %>%
@@ -72,9 +117,12 @@ p <- ggplot(df, aes(x = factor(bar_id), y = bar_height, fill = fill_color)) +
     size = 4
   ) +
   scale_fill_identity() +
-  coord_polar() +
+  coord_polar(clip = "off") +
   theme_void(base_size = 14) +
-  theme(legend.position = "none")
+  theme(
+    legend.position = "none",
+    plot.margin = margin(18, 18, 18, 18)
+  )
 
 for (i in seq_len(nrow(group_ranges))) {
   start_id <- group_ranges$start[i]
@@ -103,4 +151,4 @@ for (i in seq_len(nrow(group_ranges))) {
 
 ggsave("figureD_panel.pdf", p, width = 10, height = 10)
 ggsave("figureD_panel.svg", p, width = 10, height = 10)
-ggsave("figureD_panel.png", p, width = 10, height = 10, dpi = 600)
+ggsave("figureD_panel.png", p, width = 10, height = 10, dpi = 600, bg = "white")
