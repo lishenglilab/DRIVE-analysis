@@ -12,7 +12,16 @@ suppressPackageStartupMessages({
   library(patchwork)
 })
 
-work_dir <- "path/to/your/project"
+get_script_dir <- function() {
+  args <- commandArgs(trailingOnly = FALSE)
+  file_arg <- grep("^--file=", args, value = TRUE)
+  if (length(file_arg) > 0) {
+    return(dirname(normalizePath(sub("^--file=", "", file_arg[1]), winslash = "/", mustWork = FALSE)))
+  }
+  getwd()
+}
+
+work_dir <- get_script_dir()
 setwd(work_dir)
 
 ## -------------------------------------------------------------------------
@@ -126,7 +135,7 @@ depmap_coad <- depmap_raw[rownames(depmap_raw) %in% target_modelid, ]
 
 ## DepMap long format
 depmap_long <- depmap_coad %>%
-  rownames_to_column("ModelID") %>%
+  tibble::rownames_to_column("ModelID") %>%
   pivot_longer(
     cols = -ModelID,
     names_to = "True_Drug",
