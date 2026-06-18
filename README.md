@@ -26,8 +26,3 @@ This repository covers downstream analysis only, including:
 - experimental validation plots;
 - main and supplementary figure generation.
 
-## Notes
-
-- Some large or restricted upstream datasets are not redistributed here.
-- In those cases, scripts expect preprocessed tables derived from the original resources described in the manuscript.
-- Each script header describes its own required input files and output files.
