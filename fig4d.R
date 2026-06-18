@@ -1,9 +1,19 @@
-
-
 ############################################################
-## Fig.4D final plot code
-## Count ratio shown as continuous point-size gradient
-## Color kept consistent with original figure
+## fig4d_prediction_vs_observation_bubble_plot.R
+##
+## Purpose:
+##   Generate the Fig. 4D tissue-level measured-vs-predicted
+##   sensitivity bubble plot.
+##
+## Input:
+##   1. ml_ensemble_predictions.csv
+##   2. depmap.csv
+##
+## Output:
+##   1. Fig4D_outputs/Fig4D_plot_data.csv
+##   2. Fig4D_outputs/Fig4D_ratio_summary.csv
+##   3. Fig4D_outputs/Fig4D_tissue_bubble_plot.pdf
+##   4. Fig4D_outputs/Fig4D_tissue_bubble_plot.png
 ############################################################
 
 suppressPackageStartupMessages({
@@ -17,7 +27,16 @@ suppressPackageStartupMessages({
 ## 1. User settings
 ############################################################
 
-work_dir <- "path/to/your/project"
+get_script_dir <- function() {
+  args <- commandArgs(trailingOnly = FALSE)
+  file_arg <- grep("^--file=", args, value = TRUE)
+  if (length(file_arg) > 0) {
+    return(dirname(normalizePath(sub("^--file=", "", file_arg[1]), winslash = "/", mustWork = FALSE)))
+  }
+  getwd()
+}
+
+work_dir <- get_script_dir()
 setwd(work_dir)
 
 pred_file <- "ml_ensemble_predictions.csv"
@@ -31,6 +50,14 @@ sensitive_cutoff <- 0
 ############################################################
 ## 2. Read data
 ############################################################
+
+if (!file.exists(pred_file)) {
+  stop("Input file not found: ", pred_file)
+}
+
+if (!file.exists(true_file)) {
+  stop("Input file not found: ", true_file)
+}
 
 pred_raw <- read_csv(pred_file, show_col_types = FALSE)
 
@@ -400,3 +427,20 @@ p <- ggplot(
   )
 
 print(p)
+
+ggsave(
+  filename = file.path(out_dir, "Fig4D_prediction_validation_scatter.pdf"),
+  plot = p,
+  width = 9,
+  height = 7,
+  dpi = 300
+)
+
+ggsave(
+  filename = file.path(out_dir, "Fig4D_prediction_validation_scatter.png"),
+  plot = p,
+  width = 9,
+  height = 7,
+  dpi = 300,
+  bg = "white"
+)
