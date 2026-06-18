@@ -1,4 +1,41 @@
-library(tidyverse)
+############################################################
+## fig1c_model_algorithm_bubble_plot.R
+##
+## Purpose:
+##   Generate the Fig. 1C model-by-algorithm bubble matrix.
+##
+## Input:
+##   figureC_panel.csv
+##
+## Required columns:
+##   1. method     : model name
+##   2. algorithm  : algorithm label shown on the x-axis
+##   3. present    : 1 indicates a bubble should be drawn; 0 indicates empty
+##
+## Optional columns:
+##   1. fill_color : fill color for bubbles when present == 1
+##
+## Output:
+##   1. figureC_panel.pdf
+##   2. figureC_panel.svg
+##   3. figureC_panel.png
+############################################################
+
+suppressPackageStartupMessages({
+  library(tidyverse)
+})
+
+get_script_dir <- function() {
+  args <- commandArgs(trailingOnly = FALSE)
+  file_arg <- grep("^--file=", args, value = TRUE)
+  if (length(file_arg) > 0) {
+    return(dirname(normalizePath(sub("^--file=", "", file_arg[1]), winslash = "/", mustWork = FALSE)))
+  }
+  getwd()
+}
+
+work_dir <- get_script_dir()
+setwd(work_dir)
 
 input_file <- "figureC_panel.csv"
 
@@ -10,7 +47,19 @@ method_order <- c(
 
 algo_order <- c("DNN", "GCN", "AE", "Transformer", "MCA", "KNN", "MLP", "GAT", "GIN", "GAT_GCN")
 
-df <- read.csv(input_file, stringsAsFactors = FALSE) %>%
+if (!file.exists(input_file)) {
+  stop("Input file not found: ", input_file)
+}
+
+required_cols <- c("method", "algorithm", "present")
+df <- read.csv(input_file, stringsAsFactors = FALSE)
+
+missing_cols <- setdiff(required_cols, colnames(df))
+if (length(missing_cols) > 0) {
+  stop("Missing columns: ", paste(missing_cols, collapse = ", "))
+}
+
+df <- df %>%
   mutate(
     method = factor(method, levels = rev(method_order)),
     algorithm = factor(algorithm, levels = algo_order)
@@ -51,4 +100,4 @@ p <- ggplot(plot_df, aes(x = algorithm, y = method)) +
 
 ggsave("figureC_panel.pdf", p, width = 8, height = 10)
 ggsave("figureC_panel.svg", p, width = 8, height = 10)
-ggsave("figureC_panel.png", p, width = 8, height = 10, dpi = 600)
+ggsave("figureC_panel.png", p, width = 8, height = 10, dpi = 600, bg = "white")
