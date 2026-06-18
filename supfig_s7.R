@@ -1,8 +1,58 @@
-library(tidyverse)
-library(patchwork)
+############################################################
+## supfig_s7_internal_external_grouped_comparison.R
+##
+## Purpose:
+##   Generate Supplementary Fig. S7 comparing internal and
+##   external performance across random, tissue-holdout, and
+##   chemical-cluster-holdout settings.
+##
+## Input:
+##   ALL_split_level_internal_external_metrics.csv
+##
+## Required columns:
+##   strategy, split, holdout_group, internal_RMSE, internal_PCC,
+##   external_RMSE, external_PCC, n_test_cells, n_test_drugs,
+##   external_n_cells, external_n_drugs
+##
+## Output:
+##   1. DRIVE_internal_external_comparison_barplot.pdf
+##   2. DRIVE_internal_external_comparison_barplot.png
+############################################################
+
+suppressPackageStartupMessages({
+  library(tidyverse)
+  library(patchwork)
+})
+
+get_script_dir <- function() {
+  args <- commandArgs(trailingOnly = FALSE)
+  file_arg <- grep("^--file=", args, value = TRUE)
+  if (length(file_arg) > 0) {
+    return(dirname(normalizePath(sub("^--file=", "", file_arg[1]), winslash = "/", mustWork = FALSE)))
+  }
+  getwd()
+}
+
+work_dir <- get_script_dir()
+setwd(work_dir)
 
 metric_file <- "ALL_split_level_internal_external_metrics.csv"
+
+if (!file.exists(metric_file)) {
+  stop("Input file not found: ", metric_file)
+}
+
 df <- read_csv(metric_file, show_col_types = FALSE)
+
+required_cols <- c(
+  "strategy", "split", "holdout_group", "internal_RMSE", "internal_PCC",
+  "external_RMSE", "external_PCC", "n_test_cells", "n_test_drugs",
+  "external_n_cells", "external_n_drugs"
+)
+missing_cols <- setdiff(required_cols, colnames(df))
+if (length(missing_cols) > 0) {
+  stop("Missing columns: ", paste(missing_cols, collapse = ", "))
+}
 
 tissue_groups_to_plot <- c("blood", "lung", "urogenital_system")
 chemical_groups_to_plot <- c("Chem-A", "Chem-B", "Chem-C")
