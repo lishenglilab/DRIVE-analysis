@@ -1,6 +1,44 @@
-library(tidyverse)
+############################################################
+## supfig_s11_runtime_memory_scaling.R
+##
+## Purpose:
+##   Generate Supplementary Fig. S11 showing runtime and peak
+##   memory usage as the number of cells increases.
+##
+## Input:
+##   performance_data.csv
+##
+## Required columns:
+##   1. Cell_N
+##   2. Time
+##   3. Peak_RAM
+##
+## Output:
+##   1. Sup11.pdf
+##   2. Sup11.png
+############################################################
+
+suppressPackageStartupMessages({
+  library(tidyverse)
+})
+
+get_script_dir <- function() {
+  args <- commandArgs(trailingOnly = FALSE)
+  file_arg <- grep("^--file=", args, value = TRUE)
+  if (length(file_arg) > 0) {
+    return(dirname(normalizePath(sub("^--file=", "", file_arg[1]), winslash = "/", mustWork = FALSE)))
+  }
+  getwd()
+}
+
+work_dir <- get_script_dir()
+setwd(work_dir)
 
 input_file <- "performance_data.csv"
+
+if (!file.exists(input_file)) {
+  stop("Input file not found: ", input_file)
+}
 
 data <- read.csv(input_file, stringsAsFactors = FALSE)
 
@@ -57,3 +95,6 @@ p <- ggplot(data_long, aes(x = Cell_N, y = value, color = variable)) +
   )
 
 print(p)
+
+ggsave("Sup11.pdf", p, width = 8, height = 8, units = "in")
+ggsave("Sup11.png", p, width = 8, height = 8, units = "in", dpi = 300, bg = "white")
