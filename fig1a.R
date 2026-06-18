@@ -1,42 +1,48 @@
 ############################################################
-## fig1a_model_omics_polar_ring_formal.R
+## fig1a_model_omics_polar_ring.R
 ##
 ## Purpose:
-##   Formal cleaned script for Fig. 1A-style model-by-omics
-##   polar ring plot.
+##   Generate the Fig. 1A model-by-omics polar ring plot.
 ##
-## Key points:
-##   1. Built-in test data are included for direct testing.
-##   2. The omics legend is placed at the side.
-##   3. The center hole is preserved.
-##   4. The middle can be adjusted later in Illustrator/AI.
+## Input:
+##   fig1_model_omics_matrix.csv
+##
+## Required columns:
+##   1. Method  : model name
+##   2. Omics   : omics type
+##   3. Present : 1 indicates the omics type is used; 0 indicates not used
 ##
 ## Output:
-##   figure1_outputs/Fig1A_model_omics_polar_ring.pdf
-##   figure1_outputs/Fig1A_model_omics_polar_ring.png
-##   figure1_outputs/fig1_model_omics_matrix_test.csv
+##   1. figure1_outputs/Fig1A_model_omics_polar_ring.pdf
+##   2. figure1_outputs/Fig1A_model_omics_polar_ring.png
 ############################################################
 
 suppressPackageStartupMessages({
   library(tidyverse)
 })
 
+get_script_dir <- function() {
+  args <- commandArgs(trailingOnly = FALSE)
+  file_arg <- grep("^--file=", args, value = TRUE)
+  if (length(file_arg) > 0) {
+    return(dirname(normalizePath(sub("^--file=", "", file_arg[1]), winslash = "/", mustWork = FALSE)))
+  }
+  getwd()
+}
+
+work_dir <- get_script_dir()
+setwd(work_dir)
+
 ############################################################
 ## 1. User settings
 ############################################################
 
-## TRUE  = use built-in test data
-## FALSE = read external CSV file
-use_test_data <- TRUE
-
-## External file used only when use_test_data = FALSE
 input_file <- "fig1_model_omics_matrix.csv"
-
 out_dir <- "figure1_outputs"
 dir.create(out_dir, showWarnings = FALSE, recursive = TRUE)
 
 ############################################################
-## 2. Built-in test dataset
+## 2. Define allowed display order
 ############################################################
 
 method_order <- c(
@@ -45,53 +51,52 @@ method_order <- c(
 )
 
 omics_order <- c(
-  "Copy numbe variation",
+  "Copy number variation",
   "Gene mutation",
   "mRNA expression",
   "DNA methylation",
   "miRNA expression",
-  "Protein-protien interaction"
+  "Protein-protein interaction"
 )
 
-presence_list <- list(
-  DeepCCDS = c("Gene mutation", "mRNA expression"),
-  BANDRP   = c("Copy numbe variation", "Gene mutation", "mRNA expression", "DNA methylation"),
-  DeepAEG  = c("Copy numbe variation", "Gene mutation", "mRNA expression"),
-  DeepCDR  = c("Copy numbe variation", "Gene mutation", "mRNA expression"),
-  DeepTTA  = c("mRNA expression"),
-  DIPK     = c("mRNA expression", "Protein-protien interaction"),
-  GraphDRP = c("Gene mutation", "mRNA expression"),
-  GPDRP    = c("mRNA expression"),
-  NERD     = c("Copy numbe variation", "mRNA expression", "miRNA expression"),
-  PaccMann = c("mRNA expression"),
-  Precily  = c("mRNA expression"),
-  GADRP    = c("Copy numbe variation", "mRNA expression", "DNA methylation", "miRNA expression")
+omics_aliases <- c(
+  "Copy numbe variation" = "Copy number variation",
+  "Protein-protien interaction" = "Protein-protein interaction"
 )
-
-build_test_data <- function(methods, omics, presence_list) {
-  expand_grid(Method = methods, Omics = omics) %>%
-    rowwise() %>%
-    mutate(Present = ifelse(Omics %in% presence_list[[Method]], 1, 0)) %>%
-    ungroup()
-}
 
 ############################################################
 ## 3. Load data
 ############################################################
 
-if (use_test_data) {
-  message("Using built-in test dataset.")
-  df <- build_test_data(method_order, omics_order, presence_list)
-  write.csv(df, file.path(out_dir, "fig1_model_omics_matrix_test.csv"), row.names = FALSE)
-} else {
-  message("Reading external input file: ", input_file)
-  df <- read.csv(input_file, check.names = FALSE, stringsAsFactors = FALSE)
+if (!file.exists(input_file)) {
+  stop("Input file not found: ", input_file)
 }
+
+message("Reading external input file: ", input_file)
+df <- read.csv(input_file, check.names = FALSE, stringsAsFactors = FALSE)
 
 required_cols <- c("Method", "Omics", "Present")
 missing_cols <- setdiff(required_cols, colnames(df))
 if (length(missing_cols) > 0) {
   stop("Missing columns: ", paste(missing_cols, collapse = ", "))
+}
+
+df <- df %>%
+  mutate(
+    Method = trimws(as.character(Method)),
+    Omics = trimws(as.character(Omics)),
+    Omics = dplyr::recode(Omics, !!!as.list(omics_aliases), .default = Omics)
+  )
+
+unknown_methods <- setdiff(unique(df$Method), method_order)
+unknown_omics <- setdiff(unique(df$Omics), omics_order)
+
+if (length(unknown_methods) > 0) {
+  stop("Unknown Method values: ", paste(sort(unknown_methods), collapse = ", "))
+}
+
+if (length(unknown_omics) > 0) {
+  stop("Unknown Omics values: ", paste(sort(unknown_omics), collapse = ", "))
 }
 
 ############################################################
@@ -116,12 +121,12 @@ df <- df %>%
   filter(!is.na(Method), !is.na(Omics))
 
 omics_colors <- c(
-  "Copy numbe variation"        = "#FF5A5F",
+  "Copy number variation"       = "#FF5A5F",
   "Gene mutation"               = "#5B5CF6",
   "mRNA expression"             = "#5B96C8",
   "DNA methylation"             = "#D58AE6",
   "miRNA expression"            = "#FF929B",
-  "Protein-protien interaction" = "#9A9ACB"
+  "Protein-protein interaction" = "#9A9ACB"
 )
 
 n_methods <- length(method_order)
@@ -226,7 +231,8 @@ ggsave(
   plot = p,
   width = 9,
   height = 8,
-  dpi = 300
+  dpi = 300,
+  bg = "white"
 )
 
 message("Fig. 1A formal plot finished.")
@@ -234,4 +240,3 @@ message("Output directory: ", normalizePath(out_dir))
 message("Output files:")
 message("  - Fig1A_model_omics_polar_ring.pdf")
 message("  - Fig1A_model_omics_polar_ring.png")
-message("  - fig1_model_omics_matrix_test.csv")
