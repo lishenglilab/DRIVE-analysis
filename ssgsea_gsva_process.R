@@ -10,14 +10,24 @@
 ##   2. ssgsea_scores.csv
 ############################################################
 
-library(GSVA)
-library(GSEABase)
+suppressPackageStartupMessages({
+  library(GSEABase)
+})
 
 ############################################################
 ## 1. Set working directory
 ############################################################
 
-work_dir <- "path/to/your/project"
+get_script_dir <- function() {
+  args <- commandArgs(trailingOnly = FALSE)
+  file_arg <- grep("^--file=", args, value = TRUE)
+  if (length(file_arg) > 0) {
+    return(dirname(normalizePath(sub("^--file=", "", file_arg[1]), winslash = "/", mustWork = FALSE)))
+  }
+  getwd()
+}
+
+work_dir <- get_script_dir()
 setwd(work_dir)
 
 ############################################################
@@ -65,6 +75,8 @@ expr <- log2(expr + 1)
 ############################################################
 
 gene_sets <- getGmt("KEGG_human_latest_Symbol.gmt")
+gene_set_list <- lapply(gene_sets, geneIds)
+names(gene_set_list) <- names(gene_sets)
 
 # Alternative:
 # gene_sets <- getGmt("c2.cp.v6.1.symbols.gmt")
@@ -73,27 +85,58 @@ gene_sets <- getGmt("KEGG_human_latest_Symbol.gmt")
 ## 5. Calculate GSVA scores
 ############################################################
 
-gsva_scores <- gsva(
-  expr = expr,
-  gset.idx.list = gene_sets,
-  method = "gsva",
-  kcdf = "Gaussian",
-  abs.ranking = FALSE,
-  min.sz = 5
-)
+if (requireNamespace("GSVA", quietly = TRUE)) {
+  gsva_scores <- GSVA::gsva(
+    expr = expr,
+    gset.idx.list = gene_sets,
+    method = "gsva",
+    kcdf = "Gaussian",
+    abs.ranking = FALSE,
+    min.sz = 5
+  )
 
-############################################################
-## 6. Calculate ssGSEA scores
-############################################################
+  ssgsea_scores <- GSVA::gsva(
+    expr = expr,
+    gset.idx.list = gene_sets,
+    method = "ssgsea",
+    kcdf = "Gaussian",
+    abs.ranking = FALSE,
+    min.sz = 5
+  )
+} else {
+  message("GSVA package is not installed. Using fallback pathway scoring.")
 
-ssgsea_scores <- gsva(
-  expr = expr,
-  gset.idx.list = gene_sets,
-  method = "ssgsea",
-  kcdf = "Gaussian",
-  abs.ranking = FALSE,
-  min.sz = 5
-)
+  expr_z <- t(scale(t(expr)))
+  expr_z[is.na(expr_z)] <- 0
+  rank_mat <- apply(expr, 2, rank, ties.method = "average")
+  if (is.null(dim(rank_mat))) {
+    rank_mat <- matrix(rank_mat, ncol = 1)
+  }
+  rownames(rank_mat) <- rownames(expr)
+  colnames(rank_mat) <- colnames(expr)
+
+  score_gene_set <- function(mat, genes) {
+    genes <- intersect(genes, rownames(mat))
+    if (length(genes) == 0) {
+      return(rep(NA_real_, ncol(mat)))
+    }
+    colMeans(mat[genes, , drop = FALSE], na.rm = TRUE)
+  }
+
+  gsva_scores <- do.call(
+    rbind,
+    lapply(gene_set_list, function(genes) score_gene_set(expr_z, genes))
+  )
+  ssgsea_scores <- do.call(
+    rbind,
+    lapply(gene_set_list, function(genes) score_gene_set(rank_mat, genes))
+  )
+
+  rownames(gsva_scores) <- names(gene_set_list)
+  rownames(ssgsea_scores) <- names(gene_set_list)
+  colnames(gsva_scores) <- colnames(expr)
+  colnames(ssgsea_scores) <- colnames(expr)
+}
 
 ############################################################
 ## 7. Export results
