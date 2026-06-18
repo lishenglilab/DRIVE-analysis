@@ -1,5 +1,20 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+"""
+Purpose:
+    Generate Supplementary Fig. S10 residual correlation analysis across
+    base-model predictions on the external dataset.
+
+Input files:
+    1. gdsc_ic50.csv
+    2. cellline2.csv
+    3. Prediction files listed in MODELS_TO_ANALYZE
+
+Output files:
+    1. SupFig_S10_residual_correlation_matrix.csv
+    2. SupFig_S10_residual_correlation.pdf
+    3. SupFig_S10_input_merge_summary.csv
+"""
 
 import os
 import warnings
@@ -7,10 +22,11 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
+from pathlib import Path
 
 warnings.filterwarnings("ignore")
 
-WORK_DIR = "path/to/your/project"
+WORK_DIR = Path(__file__).resolve().parent
 os.chdir(WORK_DIR)
 
 EXTERNAL_TRUTH_FILE = "gdsc_ic50.csv"
@@ -79,7 +95,13 @@ def load_and_sync_data():
             .mean()
         )
         final_df = pd.merge(final_df, sub, on=["DrugName", "CellLineID"], how="inner")
-    return final_df
+    summary_df = pd.DataFrame(
+        [
+            {"dataset": "truth", "rows": len(truth_df), "unique_drugs": truth_df["DrugName"].nunique(), "unique_cells": truth_df["CellLineID"].nunique()},
+            {"dataset": "merged", "rows": len(final_df), "unique_drugs": final_df["DrugName"].nunique(), "unique_cells": final_df["CellLineID"].nunique()},
+        ]
+    )
+    return final_df, summary_df
 
 def plot_residual_correlation(df):
     model_names = list(MODELS_TO_ANALYZE.keys())
@@ -89,7 +111,7 @@ def plot_residual_correlation(df):
             error_df[model] = df[model] - df["TrueValue"]
 
     corr_matrix = error_df.corr(method="spearman")
-    corr_matrix.to_csv("SupFig_S7_residual_correlation_matrix.csv")
+    corr_matrix.to_csv("SupFig_S10_residual_correlation_matrix.csv")
 
     plt.rcParams["font.family"] = "serif"
     plt.rcParams["font.serif"] = "Times New Roman"
@@ -113,7 +135,8 @@ def plot_residual_correlation(df):
     plt.close()
 
 if __name__ == "__main__":
-    final_eval_df = load_and_sync_data()
+    final_eval_df, merge_summary = load_and_sync_data()
     if final_eval_df.empty:
         raise ValueError("Merged dataset is empty. Please check DrugName and CellLineID matching.")
+    merge_summary.to_csv("SupFig_S10_input_merge_summary.csv", index=False)
     plot_residual_correlation(final_eval_df)
