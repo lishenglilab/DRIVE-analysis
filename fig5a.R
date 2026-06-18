@@ -1,8 +1,62 @@
-library(tidyverse)
-library(scales)
+############################################################
+## fig5a_crc_ic50_distribution_panels.R
+##
+## Purpose:
+##   Generate the separated Fig. 5A top stacked-percentage panel
+##   and bottom IC50 gradient panel.
+##
+## Input:
+##   1. figure5_top_panel.csv
+##   2. figure5_bottom_panel.csv
+##
+## Required columns for figure5_top_panel.csv:
+##   1. cell_line
+##   2. ic50_lt_neg1
+##   3. ic50_neg1_to_0
+##   4. ic50_0_to_1
+##   5. ic50_gt_1
+##
+## Required columns for figure5_bottom_panel.csv:
+##   1. cell_line
+##   2. rank_index
+##   3. ic50_value
+##
+## Output:
+##   1. figure5_top_panel.pdf
+##   2. figure5_top_panel.svg
+##   3. figure5_top_panel.png
+##   4. figure5_bottom_panel.pdf
+##   5. figure5_bottom_panel.svg
+##   6. figure5_bottom_panel.png
+############################################################
+
+suppressPackageStartupMessages({
+  library(tidyverse)
+  library(scales)
+})
+
+get_script_dir <- function() {
+  args <- commandArgs(trailingOnly = FALSE)
+  file_arg <- grep("^--file=", args, value = TRUE)
+  if (length(file_arg) > 0) {
+    return(dirname(normalizePath(sub("^--file=", "", file_arg[1]), winslash = "/", mustWork = FALSE)))
+  }
+  getwd()
+}
+
+work_dir <- get_script_dir()
+setwd(work_dir)
 
 top_panel_file <- "figure5_top_panel.csv"
 bottom_panel_file <- "figure5_bottom_panel.csv"
+
+if (!file.exists(top_panel_file)) {
+  stop("Input file not found: ", top_panel_file)
+}
+
+if (!file.exists(bottom_panel_file)) {
+  stop("Input file not found: ", bottom_panel_file)
+}
 
 top_df <- read.csv(top_panel_file, stringsAsFactors = FALSE)
 bottom_df <- read.csv(bottom_panel_file, stringsAsFactors = FALSE)
