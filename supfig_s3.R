@@ -9,7 +9,16 @@ suppressPackageStartupMessages({
   library(ggplot2)
 })
 
-work_dir <- "path/to/your/project"
+get_script_dir <- function() {
+  args <- commandArgs(trailingOnly = FALSE)
+  file_arg <- grep("^--file=", args, value = TRUE)
+  if (length(file_arg) > 0) {
+    return(dirname(normalizePath(sub("^--file=", "", file_arg[1]), winslash = "/", mustWork = FALSE)))
+  }
+  getwd()
+}
+
+work_dir <- get_script_dir()
 setwd(work_dir)
 
 input_file <- "model_metric.csv"
@@ -28,6 +37,12 @@ df_long <- df %>%
     cols = c("RMSE", "PCC", "SCC", "R2", "NDCG", "NWPC"),
     names_to = "Metric",
     values_to = "Value"
+  ) %>%
+  mutate(
+    mode = dplyr::case_when(
+      tolower(mode) == "mixed" ~ "Mixed",
+      TRUE ~ mode
+    )
   )
 
 ## -------------------------------------------------------------------------
@@ -35,7 +50,7 @@ df_long <- df %>%
 ## -------------------------------------------------------------------------
 df_long <- df_long %>%
   mutate(
-    mode = factor(mode, levels = c("MIXed", "Cell-blind", "Drug-blind")),
+    mode = factor(mode, levels = c("Mixed", "Cell-blind", "Drug-blind")),
     Metric = factor(Metric, levels = c("RMSE", "PCC", "SCC", "R2", "NDCG", "NWPC"))
   )
 
@@ -54,7 +69,7 @@ p <- ggplot(df_long, aes(x = Metric, y = Value, fill = mode)) +
   facet_wrap(~ Method, scales = "free_y", ncol = 3) +
   scale_fill_manual(
     values = c(
-      "MIXed"       = "#E69F00",
+      "Mixed"       = "#E69F00",
       "Cell-blind"  = "#56B4E9",
       "Drug-blind"  = "#009E73"
     ),
