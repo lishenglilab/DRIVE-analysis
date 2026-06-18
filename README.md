@@ -12,7 +12,6 @@ This repository is currently organized in a flat, figure-oriented style rather t
 
 - Main-figure scripts such as `fig1a.R`, `fig2.R`, `fig4f.R`, `fig5c.R` are placed in the repository root.
 - Supplementary scripts such as `supfig_s7.R`, `supfig_s9.py`, `supfig_s12.R` are also placed in the repository root.
-- Input tables are stored alongside the scripts unless noted otherwise in the script header.
 
 ## Scope
 
