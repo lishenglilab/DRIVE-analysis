@@ -1,6 +1,22 @@
 ############################################################
-## supfig_s3_drug_response_comparison.R
-## Output: Sup3.pdf
+## supfig_s15_drug_response_comparison.R
+##
+## Purpose:
+##   Generate Supplementary Fig. S15 comparing experimental and
+##   reference IC50 values across candidate compounds.
+##
+## Input:
+##   drug_response_ic50.csv
+##
+## Required columns:
+##   1. CellLine
+##   2. Drug_Group
+##   3. Type
+##   4. Compound_Name
+##   5. IC50
+##
+## Output:
+##   1. Sup3.pdf
 ############################################################
 
 suppressPackageStartupMessages({
@@ -9,10 +25,23 @@ suppressPackageStartupMessages({
   library(ggplot2)
 })
 
-work_dir <- "path/to/your/project"
+get_script_dir <- function() {
+  args <- commandArgs(trailingOnly = FALSE)
+  file_arg <- grep("^--file=", args, value = TRUE)
+  if (length(file_arg) > 0) {
+    return(dirname(normalizePath(sub("^--file=", "", file_arg[1]), winslash = "/", mustWork = FALSE)))
+  }
+  getwd()
+}
+
+work_dir <- get_script_dir()
 setwd(work_dir)
 
 input_file <- "drug_response_ic50.csv"
+
+if (!file.exists(input_file)) {
+  stop("Input file not found: ", input_file)
+}
 
 ## -------------------------------------------------------------------------
 ## 1. Read data
