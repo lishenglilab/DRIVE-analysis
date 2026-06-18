@@ -1,18 +1,60 @@
-library(ggplot2)
-library(dplyr)
+############################################################
+## supfig_s12_predicted_ic50_violin_by_tissue.R
+##
+## Purpose:
+##   Generate Supplementary Fig. S12 showing the distribution
+##   of predicted IC50 values across tissues.
+##
+## Input:
+##   predicted_ic50_by_tissue.csv
+##
+## Required columns:
+##   1. Tissue
+##   2. IC50
+##
+## Output:
+##   1. Predicted_IC50_by_Tissue.pdf
+##   2. Predicted_IC50_by_Tissue.png
+############################################################
 
-# ============================================================
-# Load data
-# ============================================================
+suppressPackageStartupMessages({
+  library(ggplot2)
+  library(dplyr)
+})
 
-ic50_df <- read.csv(
-  "path/to/predicted_ic50_by_tissue.csv",
-  stringsAsFactors = FALSE
-)
+get_script_dir <- function() {
+  args <- commandArgs(trailingOnly = FALSE)
+  file_arg <- grep("^--file=", args, value = TRUE)
+  if (length(file_arg) > 0) {
+    return(dirname(normalizePath(sub("^--file=", "", file_arg[1]), winslash = "/", mustWork = FALSE)))
+  }
+  getwd()
+}
 
-# ============================================================
-# Data preparation
-# ============================================================
+work_dir <- get_script_dir()
+setwd(work_dir)
+
+############################################################
+## 1. Load data
+############################################################
+
+input_file <- "predicted_ic50_by_tissue.csv"
+
+if (!file.exists(input_file)) {
+  stop("Input file not found: ", input_file)
+}
+
+ic50_df <- read.csv(input_file, stringsAsFactors = FALSE)
+
+required_cols <- c("Tissue", "IC50")
+missing_cols <- setdiff(required_cols, colnames(ic50_df))
+if (length(missing_cols) > 0) {
+  stop("Missing columns: ", paste(missing_cols, collapse = ", "))
+}
+
+############################################################
+## 2. Data preparation
+############################################################
 
 ic50_df <- ic50_df %>%
   mutate(
@@ -22,9 +64,9 @@ ic50_df <- ic50_df %>%
     )
   )
 
-# ============================================================
-# Visualization
-# ============================================================
+############################################################
+## 3. Visualization
+############################################################
 
 p <- ggplot(
   ic50_df,
@@ -94,4 +136,13 @@ ggsave(
   plot = p,
   width = 8,
   height = 6
+)
+
+ggsave(
+  filename = "Predicted_IC50_by_Tissue.png",
+  plot = p,
+  width = 8,
+  height = 6,
+  dpi = 300,
+  bg = "white"
 )
