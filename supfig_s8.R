@@ -1,6 +1,21 @@
 ############################################################
-## supfig_s4_ensemble_strategy_comparison.R
-## Output: Sup4.pdf
+## supfig_s8_ensemble_strategy_comparison.R
+##
+## Purpose:
+##   Generate Supplementary Fig. S8 comparing ensemble strategies
+##   across different numbers of base models.
+##
+## Input:
+##   C3_loo_18_to_2_curves_all_strategies.csv
+##
+## Required columns:
+##   1. strategy
+##   2. num_models
+##   3. train_RMSE
+##   4. validation_RMSE
+##
+## Output:
+##   1. Sup4.pdf
 ############################################################
 
 suppressPackageStartupMessages({
@@ -12,10 +27,23 @@ suppressPackageStartupMessages({
   library(patchwork)
 })
 
-work_dir <- "path/to/your/project"
+get_script_dir <- function() {
+  args <- commandArgs(trailingOnly = FALSE)
+  file_arg <- grep("^--file=", args, value = TRUE)
+  if (length(file_arg) > 0) {
+    return(dirname(normalizePath(sub("^--file=", "", file_arg[1]), winslash = "/", mustWork = FALSE)))
+  }
+  getwd()
+}
+
+work_dir <- get_script_dir()
 setwd(work_dir)
 
 input_file <- "C3_loo_18_to_2_curves_all_strategies.csv"
+
+if (!file.exists(input_file)) {
+  stop("Input file not found: ", input_file)
+}
 
 ## -------------------------------------------------------------------------
 ## 1. Read data
@@ -23,6 +51,12 @@ input_file <- "C3_loo_18_to_2_curves_all_strategies.csv"
 ##   strategy, num_models, train_RMSE, validation_RMSE
 ## -------------------------------------------------------------------------
 df <- read.csv(input_file, check.names = FALSE)
+
+required_cols <- c("strategy", "num_models", "train_RMSE", "validation_RMSE")
+missing_cols <- setdiff(required_cols, colnames(df))
+if (length(missing_cols) > 0) {
+  stop("Missing columns: ", paste(missing_cols, collapse = ", "))
+}
 
 ## -------------------------------------------------------------------------
 ## 2. Factor ordering for strategies
