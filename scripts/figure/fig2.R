@@ -1,306 +1,198 @@
 ############################################################
-## fig2_three_setting_benchmark.R
+## fig2_three_setting_benchmark_final.R
 ##
-## Purpose:
-##   Generate the Fig. 2 benchmark plots for Mixed, Drug-blind,
-##   and Cell-blind settings from one external Excel table.
-##
-## Input:
-##   synthetic_benchmark_settings.xlsx
-##
-## Required columns:
-##   1. Method
-##   2. RMSE
-##   3. PCC
-##   4. SCC
-##   5. R2
-##   6. NDCG
-##   7. NWPC
-##   8. Setting
-##
-## Output:
-##   1. Fig2_three_settings/fig2_three_setting_long.csv
-##   2. Fig2_three_settings/fig2_three_setting_summary.csv
-##   3. Fig2_three_settings/Fig2_model_palette.csv
-##   4. Fig2_three_settings/Fig2_*_benchmark.pdf
-##   5. Fig2_three_settings/Fig2_*_benchmark.png
+## Read model_metric.csv, remove ML baseline, and generate
+## three 12:9 benchmark PDFs with raw-value scatter points.
 ############################################################
 
-## =========================
-## 0. Packages
-## =========================
-
-pkgs <- c("readxl", "tidyverse", "patchwork")
-
+pkgs <- c("readr", "dplyr", "tidyr", "stringr", "ggplot2", "patchwork")
 missing_pkgs <- pkgs[!vapply(pkgs, requireNamespace, logical(1), quietly = TRUE)]
 if (length(missing_pkgs) > 0) {
-  stop(
-    "Missing required packages: ",
-    paste(missing_pkgs, collapse = ", "),
-    ". Please install them before running this script."
-  )
+  stop("Missing required packages: ", paste(missing_pkgs, collapse = ", "))
 }
 
-library(readxl)
-library(tidyverse)
-library(patchwork)
+suppressPackageStartupMessages({
+  library(readr)
+  library(dplyr)
+  library(tidyr)
+  library(stringr)
+  library(ggplot2)
+  library(patchwork)
+})
 
 get_script_dir <- function() {
   args <- commandArgs(trailingOnly = FALSE)
   file_arg <- grep("^--file=", args, value = TRUE)
   if (length(file_arg) > 0) {
-    return(dirname(normalizePath(sub("^--file=", "", file_arg[1]), winslash = "/", mustWork = FALSE)))
+    return(dirname(normalizePath(sub("^--file=", "", file_arg[1]),
+                                 winslash = "/", mustWork = FALSE)))
   }
   getwd()
 }
 
-work_dir <- get_script_dir()
-setwd(work_dir)
-
-## =========================
-## 1. Input / output
-## =========================
-
-input_file <- "synthetic_benchmark_settings.xlsx"
+setwd(get_script_dir())
+args <- commandArgs(trailingOnly = TRUE)
+input_file <- if (length(args) > 0) args[1] else "model_metric.csv"
 out_dir <- "Fig2_three_settings"
 dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 
-if (!file.exists(input_file)) {
-  stop("Input file not found: ", input_file)
-}
+if (!file.exists(input_file)) stop("Input file not found: ", input_file)
 
-## =========================
-## 2. Read data
-## =========================
-
-raw_df <- read_excel(input_file)
-
-colnames(raw_df) <- colnames(raw_df) %>%
+raw_df <- read_csv(input_file, show_col_types = FALSE)
+names(raw_df) <- names(raw_df) %>%
   str_replace_all("\\s+", "_") %>%
   str_replace_all("\\.", "_")
 
-required_cols <- c("Method", "RMSE", "PCC", "SCC", "R2", "NDCG", "NWPC", "Setting")
-
-missing_cols <- setdiff(required_cols, colnames(raw_df))
+required_cols <- c("Method", "RMSE", "PCC", "SCC", "R2", "NDCG", "NWPC", "mode")
+missing_cols <- setdiff(required_cols, names(raw_df))
 if (length(missing_cols) > 0) {
   stop("Missing columns: ", paste(missing_cols, collapse = ", "))
 }
 
+metric_levels <- c("NDCG", "NWPC", "PCC", "R2", "RMSE", "SCC")
+setting_levels <- c("Mixed", "Drug-blind", "Cell-blind")
+
 df_long <- raw_df %>%
-  mutate(
+  transmute(
     Method = trimws(as.character(Method)),
-    Setting = as.character(Setting),
-    Method = str_replace_all(Method, "[\u2010-\u2015\u2212]", "-")
+    Setting = trimws(as.character(mode)),
+    across(all_of(metric_levels), as.numeric)
   ) %>%
-  pivot_longer(
-    cols = c(RMSE, PCC, SCC, R2, NDCG, NWPC),
-    names_to = "Metric",
-    values_to = "Value"
-  ) %>%
+  filter(!str_detect(str_to_lower(Method), "^ml(?:\\s+baseline)?$")) %>%
+  pivot_longer(all_of(metric_levels), names_to = "Metric", values_to = "Value") %>%
   mutate(
-    Value = as.numeric(Value),
     Setting = case_when(
-      str_detect(tolower(Setting), "mixed") ~ "Mixed",
-      str_detect(tolower(Setting), "drug") ~ "Drug-blind",
-      str_detect(tolower(Setting), "cell") ~ "Cell-blind",
+      str_detect(str_to_lower(Setting), "mixed") ~ "Mixed",
+      str_detect(str_to_lower(Setting), "drug") ~ "Drug-blind",
+      str_detect(str_to_lower(Setting), "cell") ~ "Cell-blind",
       TRUE ~ Setting
     ),
-    Metric = factor(
-      Metric,
-      levels = c("NDCG", "NWPC", "PCC", "R2", "RMSE", "SCC")
-    ),
-    Setting = factor(
-      Setting,
-      levels = c("Mixed", "Drug-blind", "Cell-blind")
-    )
+    Metric = factor(Metric, levels = metric_levels),
+    Setting = factor(Setting, levels = setting_levels)
   ) %>%
-  filter(!is.na(Value))
-
-## =========================
-## 3. Summary statistics
-## =========================
+  filter(!is.na(Value), !is.na(Setting), nzchar(Method))
 
 summary_df <- df_long %>%
   group_by(Setting, Method, Metric) %>%
   summarise(
-    n = n(),
-    Mean = mean(Value, na.rm = TRUE),
-    SD = sd(Value, na.rm = TRUE),
-    SEM = SD / sqrt(n),
+    n = n(), Mean = mean(Value), SD = sd(Value), SEM = SD / sqrt(n),
     .groups = "drop"
   ) %>%
-  mutate(
-    SEM = ifelse(is.na(SEM), 0, SEM)
-  )
+  mutate(SEM = if_else(is.na(SEM), 0, SEM))
 
 write_csv(df_long, file.path(out_dir, "fig2_three_setting_long.csv"))
 write_csv(summary_df, file.path(out_dir, "fig2_three_setting_summary.csv"))
 
-## =========================
-## 4. Plot settings
-## =========================
-
+## Colors remain attached to model names, even when bars are sorted by value.
 model_palette <- c(
+  "GraphDRP-GINConvNet" = "#8EACE0",
+  "GraphDRP_GAT_GCN" = "#C49CDD",
+  "GraphDRP_GATNet" = "#ACA4E2",
+  "GraphDRP_GCNNet" = "#D596D2",
+  "DeepTTA" = "#79BA7E",
   "BANDRP" = "#DB9D85",
-  "DeepAEG" = "#CFA373",
-  "DeepCDR" = "#ABB065",
-  "DeepTTA" = "#93B66E",
-  "DIPK" = "#79BA7E",
-  "GraphDRP" = "#ACA4E2",
-  "GPDRP" = "#41BEA7",
   "NERD" = "#E093C3",
-  "PaccMann" = "#E2969A",
+  "GADRP" = "#5CBD92",
+  "GPDRP_GAT" = "#41BEA7",
+  "GPDRP_GIN" = "#4CB9CC",
+  "GPDRP_GCN" = "#38BDBB",
+  "GPDRP_Trans" = "#6CB4D9",
+  "DIPK" = "#CFA373",
   "Precily" = "#E494AF",
-  "GADRP" = "#5CBB92",
-  "DeepCCDS" = "#BFA967"
+  "paccmann" = "#E2979A",
+  "DeepAEG" = "#BFAA67",
+  "DeepCDR" = "#93B66E",
+  "DeepCCDS" = "#ABB065"
 )
 
-errorbar_color <- "gray30"
-
-write_csv(
-  tibble(Method = names(model_palette), Color = unname(model_palette)),
-  file.path(out_dir, "Fig2_model_palette.csv")
+legend_order <- c(
+  "BANDRP", "DeepAEG", "DeepCDR", "DeepTTA", "DIPK",
+  "GraphDRP_GAT_GCN", "GraphDRP_GATNet", "GraphDRP_GCNNet", "GraphDRP-GINConvNet",
+  "GPDRP_GAT", "GPDRP_GCN", "GPDRP_GIN", "GPDRP_Trans",
+  "NERD", "paccmann", "Precily", "GADRP", "DeepCCDS"
 )
+legend_order <- legend_order[legend_order %in% unique(df_long$Method)]
+write_csv(tibble(Method = legend_order, Color = unname(model_palette[legend_order])),
+          file.path(out_dir, "Fig2_model_palette.csv"))
 
-theme_fig2_panel <- function(base_size = 14) {
+theme_fig2_panel <- function(base_size = 13) {
+  panel_aspect <- (50.354 + 3.223) / 31.175
   theme_classic(base_size = base_size) +
     theme(
-      axis.title.x = element_blank(),
-      axis.text.x = element_blank(),
+      axis.title.x = element_blank(), axis.text.x = element_blank(),
       axis.ticks.x = element_blank(),
-      axis.text.y = element_text(color = "black", size = base_size),
-      axis.title.y = element_text(color = "black", size = base_size + 3),
-      strip.background = element_rect(fill = "white", color = "black", linewidth = 0.9),
-      strip.text = element_text(color = "black", size = base_size + 1),
-      panel.border = element_rect(fill = NA, color = "black", linewidth = 0.7),
-      legend.position = "right",
-      plot.title = element_text(size = base_size + 5, face = "bold", hjust = 0.5),
-      plot.margin = margin(5, 5, 5, 5)
+      axis.text.y = element_text(color = "black"),
+      axis.title.y = element_text(color = "black", size = base_size + 1),
+      strip.background = element_rect(fill = "white", color = "black", linewidth = 1.1),
+      strip.text = element_text(color = "black", size = base_size + 1, face = "plain"),
+      panel.border = element_rect(fill = NA, color = "black", linewidth = 1.1),
+      aspect.ratio = panel_aspect,
+      legend.position = "right", plot.margin = margin(4, 4, 4, 4)
     )
 }
 
-## =========================
-## 5. Plot function
-## =========================
-
-plot_metric_panel <- function(setting_name, metric_name, data_summary, show_y_title = FALSE) {
-  y_lab <- if (show_y_title) "Mean Value" else ""
-
+plot_metric_panel <- function(setting_name, metric_name, data_summary, data_long,
+                              show_y_title = FALSE) {
   plot_df <- data_summary %>%
-    filter(
-      Setting == setting_name,
-      Metric == metric_name
-    ) %>%
-    arrange(desc(Mean)) %>%
+    filter(Setting == setting_name, Metric == metric_name) %>%
+    { if (metric_name == "RMSE") arrange(., Mean, Method) else arrange(., desc(Mean), Method) } %>%
     mutate(
       DisplayOrder = factor(seq_len(n()), levels = seq_len(n())),
-      Method = factor(Method, levels = names(model_palette))
+      Method = factor(as.character(Method), levels = legend_order)
     )
 
-  ggplot(plot_df, aes(x = DisplayOrder, y = Mean, fill = Method)) +
-    geom_col(
-      width = 0.82,
-      color = NA,
-      alpha = 0.95
+  point_df <- data_long %>%
+    filter(Setting == setting_name, Metric == metric_name) %>%
+    mutate(Method = factor(as.character(Method), levels = legend_order)) %>%
+    inner_join(plot_df %>% select(Method, DisplayOrder), by = "Method")
+
+  lower_value <- min(c(point_df$Value, plot_df$Mean - plot_df$SEM), na.rm = TRUE)
+  upper_value <- max(c(point_df$Value, plot_df$Mean + plot_df$SEM), na.rm = TRUE)
+  lower_limit <- if (lower_value < 0) lower_value - 0.2 else 0
+  upper_limit <- upper_value + 0.2
+  tick_step <- if (metric_name == "RMSE") {
+    if (setting_name == "Drug-blind") 1 else 0.5
+  } else if (metric_name == "R2" && setting_name == "Drug-blind") {
+    0.5
+  } else {
+    0.2
+  }
+
+  ggplot(plot_df, aes(DisplayOrder, Mean, fill = Method)) +
+    geom_col(width = 0.9, color = NA, linewidth = 0) +
+    geom_errorbar(aes(ymin = Mean - SEM, ymax = Mean + SEM),
+                  width = 0.16, linewidth = 0.8, color = "black") +
+    geom_jitter(data = point_df, aes(DisplayOrder, Value), inherit.aes = FALSE,
+                width = 0.08, height = 0, size = 1.5, color = "#6B6B6B", alpha = 0.9) +
+    labs(x = NULL, y = if (show_y_title) "Mean Value" else "", fill = "Model") +
+    scale_fill_manual(values = model_palette, breaks = legend_order, drop = FALSE) +
+    scale_y_continuous(
+      limits = c(lower_limit, upper_limit),
+      breaks = scales::breaks_width(tick_step),
+      expand = c(0, 0)
     ) +
-    geom_errorbar(
-      aes(ymin = Mean - SEM, ymax = Mean + SEM),
-      width = 0.22,
-      linewidth = 0.45,
-      color = errorbar_color
-    ) +
-    labs(
-      x = NULL,
-      y = y_lab,
-      fill = "Model"
-    ) +
-    scale_fill_manual(values = model_palette, drop = FALSE) +
-    facet_wrap(~ Metric, scales = "free_y") +
+    facet_wrap(~Metric, scales = "fixed") +
     theme_fig2_panel()
 }
 
-plot_one_setting <- function(setting_name, data_summary) {
-  p1 <- plot_metric_panel(setting_name, "NDCG", data_summary, show_y_title = TRUE)
-  p2 <- plot_metric_panel(setting_name, "NWPC", data_summary, show_y_title = FALSE)
-  p3 <- plot_metric_panel(setting_name, "PCC", data_summary, show_y_title = FALSE)
-
-  p4 <- plot_metric_panel(setting_name, "R2", data_summary, show_y_title = TRUE)
-  p5 <- plot_metric_panel(setting_name, "RMSE", data_summary, show_y_title = FALSE)
-  p6 <- plot_metric_panel(setting_name, "SCC", data_summary, show_y_title = FALSE)
-
-  (p1 + p2 + p3) / (p4 + p5 + p6) +
-    plot_layout(guides = "collect") +
-    plot_annotation(title = setting_name) &
-    theme(
-      legend.position = "right",
-      legend.title = element_text(size = 12, face = "bold"),
-      legend.text = element_text(size = 10),
-      plot.title = element_text(size = 22, face = "bold", hjust = 0.5)
-    ) &
+plot_one_setting <- function(setting_name) {
+  plots <- lapply(seq_along(metric_levels), function(i) {
+    plot_metric_panel(setting_name, metric_levels[i], summary_df, df_long,
+                      show_y_title = i %in% c(1, 4))
+  })
+  wrap_plots(plots, ncol = 3) +
+    plot_layout(guides = "collect") &
+    theme(legend.position = "right",
+          legend.title = element_text(size = 11, face = "bold"),
+          legend.text = element_text(size = 8.5)) &
     guides(fill = guide_legend(ncol = 1, byrow = TRUE))
 }
 
-## =========================
-## 6. Generate three plots
-## =========================
-
-settings_to_plot <- c("Mixed", "Drug-blind", "Cell-blind")
-
-for (s in settings_to_plot) {
-  p <- plot_one_setting(s, summary_df)
-  file_stub <- str_replace_all(s, "-", "_")
-
-  ggsave(
-    filename = file.path(out_dir, paste0("Fig2_", file_stub, "_benchmark.pdf")),
-    plot = p,
-    width = 14,
-    height = 9,
-    units = "in",
-    limitsize = FALSE
-  )
-
-  ggsave(
-    filename = file.path(out_dir, paste0("Fig2_", file_stub, "_benchmark.png")),
-    plot = p,
-    width = 14,
-    height = 9,
-    units = "in",
-    dpi = 600,
-    limitsize = FALSE
-  )
+for (setting_name in setting_levels) {
+  p <- plot_one_setting(setting_name)
+  stub <- str_replace_all(setting_name, "-", "_")
+  ggsave(file.path(out_dir, paste0("Fig2_", stub, "_benchmark.pdf")), p,
+         width = 12, height = 9, units = "in", limitsize = FALSE)
+  ggsave(file.path(out_dir, paste0("Fig2_", stub, "_benchmark.png")), p,
+         width = 12, height = 9, units = "in", dpi = 600, limitsize = FALSE)
 }
-
-## =========================
-## 7. Optional previews
-## =========================
-
-p_mixed <- plot_one_setting("Mixed", summary_df)
-p_drug <- plot_one_setting("Drug-blind", summary_df)
-p_cell <- plot_one_setting("Cell-blind", summary_df)
-
-ggsave(
-  filename = file.path(out_dir, "Fig2_Mixed_benchmark_preview.pdf"),
-  plot = p_mixed,
-  width = 14,
-  height = 9,
-  units = "in",
-  limitsize = FALSE
-)
-
-ggsave(
-  filename = file.path(out_dir, "Fig2_Drug_blind_benchmark_preview.pdf"),
-  plot = p_drug,
-  width = 14,
-  height = 9,
-  units = "in",
-  limitsize = FALSE
-)
-
-ggsave(
-  filename = file.path(out_dir, "Fig2_Cell_blind_benchmark_preview.pdf"),
-  plot = p_cell,
-  width = 14,
-  height = 9,
-  units = "in",
-  limitsize = FALSE
-)
